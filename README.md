@@ -23,7 +23,7 @@ pip install -r requirements.txt
 
 ## run
 ```bash
-streamit run planer.py
+streamlit run planer.py
 ```
 Stop with Ctrl+C in terminal.
 

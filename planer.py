@@ -30,7 +30,7 @@ st.title("Coaching Session Input Form")
 # Input form
 with st.form("coaching_form"):
     # Input fields
-    coach_name = st.text_input("Coach Name")
+    coach_name = st.text_input("Trainer Name")
     day_in_week = st.selectbox("Day in Week", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
     client_names = st.text_area("Client Names (separated by commas)")
     hour_in_day = st.time_input("Hour in Day")
