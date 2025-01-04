@@ -1,28 +1,80 @@
 import streamlit as st
 import json
-from datetime import datetime, time
+from datetime import datetime, timedelta, time
 from pathlib import Path
 from streamlit_calendar import calendar
 
+# Example data
+EXAMPLE_EVENTS = [
+    {
+        "title": "🎾 Forehand Practice - Felix Coaching Alice",
+        "start": (datetime.now() + timedelta(days=1, hours=2)).isoformat(),
+        "end": (datetime.now() + timedelta(days=1, hours=3)).isoformat(),
+        "resourceId": "Felix Ott",
+        "backgroundColor": "#C1D6FF",
+        "textColor": "#000000",
+    },
+    {
+        "title": "🎾 Backhand Practice - Pino Coaching Bob",
+        "start": (datetime.now() + timedelta(days=2, hours=1)).isoformat(),
+        "end": (datetime.now() + timedelta(days=2, hours=2)).isoformat(),
+        "resourceId": "Pino Ott",
+        "backgroundColor": "#FFD1B2",
+        "textColor": "#000000",
+    },
+]
+
+EXAMPLE_STUDENTS = {
+    "Alice Smith": "alice@example.com",
+    "Bob Johnson": "bob@example.com",
+    "Charlie Brown": "charlie@example.com",
+    "Diana Prince": "diana@example.com",
+    "Eve White": "eve@example.com",
+}
+
+EXAMPLE_GROUPS = {
+    "1. Herren": ["Alice Smith", "Bob Johnson"],
+    "2. Herren": ["Charlie Brown", "Diana Prince"],
+    "Herren 30": ["Eve White"],
+}
+
+EXAMPLE_PROFILE = {
+    "Name": "Tennis Coach",
+    "Email": "coach@example.com",
+    "Phone": "+49 123 456 789",
+    "Address": "123 Tennis Court Lane, Berlin, Germany",
+}
+
 # Load and save data
-def load_data():
-    file_path = Path("plan.json")
+def load_data(file_name, default_data):
+    file_path = Path(file_name)
     if file_path.exists():
-        with open("plan.json", "r") as f:
+        with open(file_name, "r") as f:
             data = json.load(f)
     else:
-        data = {"events": []}
+        data = default_data
     return data
 
-def save_data(data):
-    with open("plan.json", "w") as f:
+def save_data(file_name, data):
+    with open(file_name, "w") as f:
         json.dump(data, f)
 
-# Load events
-if "all_events" not in st.session_state:
-    st.session_state["all_events"] = load_data().get("events", [])
+# Initialize data files
+EVENTS_FILE = "plan.json"
+DATA_FILE = "data.json"
 
-all_events = st.session_state["all_events"]
+# Load or set default data
+all_events = load_data(EVENTS_FILE, {"events": EXAMPLE_EVENTS})["events"]
+data = load_data(DATA_FILE, {"students": EXAMPLE_STUDENTS, "groups": EXAMPLE_GROUPS})
+students = data.get("students", {})
+groups = data.get("groups", {})
+
+if "all_events" not in st.session_state:
+    st.session_state["all_events"] = all_events
+if "students" not in st.session_state:
+    st.session_state["students"] = students
+if "groups" not in st.session_state:
+    st.session_state["groups"] = groups
 
 # Define coaches and colors
 coaches = [
@@ -40,20 +92,10 @@ coach_colors = {
     "Paul Sämann": "#D1B2FF",
 }
 
-# Define students and groups
-students = ["Alice", "Bob", "Charlie", "Diana", "Eve"]
-groups = {
-    "1. Herren": ["Max", "Tom", "Leon"],
-    "2. Herren": ["Chris", "Luke", "Phil"],
-    "Herren 30": ["Jan", "Oliver", "Kevin"],
-    "Herren 40": ["Matthias", "Stefan", "Uwe"],
-    "1. Damen": ["Sophie", "Marie", "Nina"],
-}
-
-# Add colors and ensure proper text visibility for events
-for event in all_events:
+# Add colors to events
+for event in st.session_state["all_events"]:
     event["backgroundColor"] = coach_colors.get(event["resourceId"], "#D3D3D3")
-    event["textColor"] = "#000000"  # Set text color to black for readability
+    event["textColor"] = "#000000"  # Ensure text visibility
 
 # Calendar options
 calendar_options = {
@@ -72,17 +114,27 @@ calendar_options = {
 st.set_page_config(layout="wide", page_title="Training Scheduler")
 
 # Sidebar Navigation
+if "selected_page" not in st.session_state:
+    st.session_state["selected_page"] = "Calendar"
+
+# Define navigation function
+def navigate(page):
+    st.session_state["selected_page"] = page
+
 st.sidebar.title("Navigation")
-menu_options = ["Calendar", "Profile", "Contacts"]
-selected_page = st.sidebar.radio("Go to", menu_options)
+st.sidebar.button("Calendar", on_click=navigate, args=("Calendar",))
+st.sidebar.button("Profile", on_click=navigate, args=("Profile",))
+st.sidebar.button("Contacts", on_click=navigate, args=("Contacts",))
+st.sidebar.button("Groups", on_click=navigate, args=("Groups",))
 
 # Sign Out Button at the bottom
+st.sidebar.markdown("---")
 if st.sidebar.button("Sign Out"):
     st.session_state["logged_in"] = False
     st.experimental_rerun()
 
-# Page Content Based on Sidebar Selection
-if selected_page == "Calendar":
+# Page Content Based on Selected Page
+if st.session_state["selected_page"] == "Calendar":
     st.title("🎾 Training Scheduler")
 
     # Add Event Section
@@ -92,10 +144,16 @@ if selected_page == "Calendar":
     # Student or Group Selection
     option = st.radio("Select Mode", ["Individual Students", "Groups"])
     if option == "Individual Students":
-        selected_students = st.multiselect("Select Student(s)", students, default=[])
+        selected_students = st.multiselect("Select Student(s)", list(students.keys()), default=[])
+        group_event = False
     elif option == "Groups":
         selected_group = st.selectbox("Select a Group", list(groups.keys()))
-        selected_students = groups[selected_group]
+        if selected_group != "Choose an Option":
+            selected_students = groups[selected_group]
+            group_event = True
+        else:
+            selected_students = []
+            group_event = False
 
     # Training Details
     training_types = [
@@ -119,10 +177,10 @@ if selected_page == "Calendar":
             start = datetime.combine(event_start_date, event_start_time).isoformat()
             end = datetime.combine(event_start_date, event_end_time).isoformat()
 
-            # Create events for each selected student
-            for student in selected_students:
+            if group_event:
+                # Create one event for the entire group
                 new_event = {
-                    "title": f"{training_type} - {coach} Coaching {student}",
+                    "title": f"{training_type} - {coach} Coaching {selected_group}",
                     "start": start,
                     "end": end,
                     "resourceId": coach,
@@ -130,29 +188,27 @@ if selected_page == "Calendar":
                     "textColor": "#000000",
                 }
                 st.session_state["all_events"].append(new_event)
+                st.success(f"Event for group '{selected_group}' added successfully!")
+            else:
+                # Create individual events for each student
+                for student in selected_students:
+                    new_event = {
+                        "title": f"{training_type} - {coach} Coaching {student}",
+                        "start": start,
+                        "end": end,
+                        "resourceId": coach,
+                        "backgroundColor": coach_colors.get(coach, "#D3D3D3"),
+                        "textColor": "#000000",
+                    }
+                    st.session_state["all_events"].append(new_event)
+                st.success(f"Event for {', '.join(selected_students)} added successfully!")
 
             # Save updated events
-            save_data({"events": st.session_state["all_events"]})
-            st.success(f"Event for {', '.join(selected_students)} added successfully!")
-
-    # View Coach Dropdown
-    st.subheader("View Coach")
-    view_options = ["All"] + coaches
-    selected_view = st.selectbox("View", view_options)
-
-    # Filter events based on the selected view
-    if selected_view == "All":
-        filtered_events = st.session_state["all_events"]
-    else:
-        filtered_events = [
-            event for event in st.session_state["all_events"] if event["resourceId"] == selected_view
-        ]
+            save_data(EVENTS_FILE, {"events": st.session_state["all_events"]})
 
     # Calendar Section
     st.subheader("Calendar")
-    st.markdown('<div class="streamlit-calendar-container">', unsafe_allow_html=True)
-    calendar(events=filtered_events, options=calendar_options)
-    st.markdown('</div>', unsafe_allow_html=True)
+    calendar(events=st.session_state["all_events"], options=calendar_options)
 
     # Delete Event Section
     st.subheader("Delete an Event")
@@ -168,17 +224,101 @@ if selected_page == "Calendar":
             ]
 
             # Save updated events
-            save_data({"events": st.session_state["all_events"]})
+            save_data(EVENTS_FILE, {"events": st.session_state["all_events"]})
             st.success(f"Event '{selected_event}' deleted successfully!")
     else:
         st.info("No events available to delete.")
 
-elif selected_page == "Profile":
+elif st.session_state["selected_page"] == "Profile":
     st.title("👤 Profile Page")
-    st.write("Welcome to your profile!")
-    st.write("Manage your personal information here.")
+    st.write(f"**Name:** {EXAMPLE_PROFILE['Name']}")
+    st.write(f"**Email:** {EXAMPLE_PROFILE['Email']}")
+    st.write(f"**Phone:** {EXAMPLE_PROFILE['Phone']}")
+    st.write(f"**Address:** {EXAMPLE_PROFILE['Address']}")
 
-elif selected_page == "Contacts":
+elif st.session_state["selected_page"] == "Contacts":
     st.title("📇 Contacts Page")
-    st.write("Manage your contacts here!")
-    st.write("You can add, view, and edit your contact list.")
+
+    # Section: Add New Student
+    st.subheader("Add a New Student")
+    with st.form("add_student_form", clear_on_submit=True):
+        name = st.text_input("First Name")
+        surname = st.text_input("Last Name")
+        email = st.text_input("Email")
+        submitted = st.form_submit_button("Add Student")
+
+        if submitted:
+            if name and surname and email:
+                full_name = f"{name} {surname}"
+                if full_name in st.session_state["students"]:
+                    st.warning(f"Student '{full_name}' already exists.")
+                else:
+                    st.session_state["students"][full_name] = email
+                    save_data(DATA_FILE, {"students": st.session_state["students"], "groups": st.session_state["groups"]})
+                    st.success(f"Student '{full_name}' added successfully!")
+            else:
+                st.error("Please fill in all fields.")
+
+    # Section: Display Student Contacts
+    st.subheader("Student Contacts")
+    for student, email in st.session_state["students"].items():
+        st.markdown(
+            f"""
+            <div style="background-color: #d3d3d3; padding: 15px; border-radius: 10px; border: 1px solid #a9a9a9; margin-bottom: 10px; font-size: 16px; color: black;">
+                <strong>{student}</strong>: {email}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+elif st.session_state["selected_page"] == "Groups":
+    st.title("👥 Group Management")
+
+    # Section: Create a New Group
+    st.subheader("Create a New Group")
+    group_name = st.text_input("Enter Group Name")
+    if group_name:
+        if group_name in groups:
+            st.warning("This group name already exists. Choose a different name.")
+        else:
+            # Allow selecting students after entering a valid group name
+            st.markdown("### Select Students for the Group")
+            group_members = st.multiselect("Choose Students", list(students.keys()))
+            if st.button("Create Group"):
+                if group_members:
+                    groups[group_name] = group_members
+                    st.session_state["groups"] = groups
+                    save_data(DATA_FILE, {"students": st.session_state["students"], "groups": st.session_state["groups"]})
+                    st.success(f"Group '{group_name}' created successfully with members: {', '.join(group_members)}!")
+                else:
+                    st.error("Please select at least one student to create a group.")
+    else:
+        st.info("Enter a group name to start creating a group.")
+
+    # Section: Existing Groups
+    st.subheader("Existing Groups")
+    if groups:
+        for group_name, members in groups.items():
+            st.markdown(
+                f"""
+                <div style="background-color: #d3d3d3; padding: 15px; border-radius: 10px; border: 1px solid #a9a9a9; margin-bottom: 10px; font-size: 16px; color: black;">
+                    <strong>{group_name}</strong>: {', '.join(members)}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+    else:
+        st.info("No groups available.")
+
+    # Section: Delete a Group
+    st.subheader("Delete a Group")
+    if groups:
+        group_to_delete = st.selectbox("Select a Group to Delete", ["Choose an Option"] + list(groups.keys()))
+        if group_to_delete != "Choose an Option":
+            if st.button("Delete Group"):
+                del groups[group_to_delete]
+                st.session_state["groups"] = groups
+                save_data(DATA_FILE, {"students": students, "groups": groups})
+                st.success(f"Group '{group_to_delete}' deleted successfully!")
+    else:
+        st.info("No groups available to delete.")
