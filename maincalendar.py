@@ -36,6 +36,7 @@ EXAMPLE_PROFILE = {
     "Address": "123 Tennis Court Lane, Berlin, Germany",
 }
 
+
 # Load and save data
 def load_data(file_name, default_data):
     file_path = Path(file_name)
@@ -46,13 +47,41 @@ def load_data(file_name, default_data):
         data = default_data
     return data
 
+
 def save_data(file_name, data):
     with open(file_name, "w") as f:
         json.dump(data, f)
 
+
+def sign_in(user_name, password):
+    # Create a placeholder
+    message_placeholder = st.empty()
+    user_data = load_data(USER_DATA_FILE, {})
+    if user_name in user_data and user_data[user_name] == password:
+        st.session_state["selected_page"] = "Calendar"
+        message_placeholder.success("Sign-in successful!")
+    elif user_name not in user_data:
+        message_placeholder.warning("Username not recognized.")
+    else:
+        message_placeholder.error("Incorrect password.")
+
+USER_DATA_FILE = Path("user_data.json")
+user_data = load_data(USER_DATA_FILE, {})
+if "selected_page" not in st.session_state:
+    st.session_state["selected_page"] = "Login"
+
+if st.session_state["selected_page"] == "Login":
+    # login page if not logged in
+    user_name = st.text_input("User Name", key="user_name")
+    password = st.text_input("Password", type="password")
+    sign_in_button = st.button("Sign In")
+    if sign_in_button:
+        sign_in(user_name, password)
+
 # Initialize data files
 EVENTS_FILE = "plan.json"
 DATA_FILE = "data.json"
+
 all_events = load_data(EVENTS_FILE, {"events": EXAMPLE_EVENTS})["events"]
 data = load_data(DATA_FILE, {"contacts": EXAMPLE_CONTACTS, "groups": EXAMPLE_GROUPS})
 contacts = data.get("contacts", {})
@@ -64,13 +93,11 @@ if "contacts" not in st.session_state:
     st.session_state["contacts"] = contacts
 if "groups" not in st.session_state:
     st.session_state["groups"] = groups
-if "selected_page" not in st.session_state:
-    st.session_state["selected_page"] = "Calendar"
 
 # Define courts as resources
 courts = [
-    {"id": f"Court {i}", "title": f"Court {i}"} for i in range(1, 7)
-] + [{"id": f"Court {i}", "title": f"Court {i} (Indoor)"} for i in range(7, 9)]
+             {"id": f"Court {i}", "title": f"Court {i}"} for i in range(1, 7)
+         ] + [{"id": f"Court {i}", "title": f"Court {i} (Indoor)"} for i in range(7, 9)]
 
 # Calendar options
 calendar_options = {
@@ -103,15 +130,56 @@ calendar_options = {
     },
 }
 
+
 # Navigation
 def navigate(page):
     st.session_state["selected_page"] = page
 
-st.sidebar.title("Navigation")
-st.sidebar.button("Calendar", on_click=navigate, args=("Calendar",))
-st.sidebar.button("Profile", on_click=navigate, args=("Profile",))
-st.sidebar.button("Contacts", on_click=navigate, args=("Contacts",))
-st.sidebar.button("Groups", on_click=navigate, args=("Groups",))
+if st.session_state["selected_page"] != "Login":
+    st.sidebar.title("Navigation")
+
+    # Group for the main navigation buttons
+    with st.sidebar:
+        # Inject custom CSS for flexbox layout
+        st.markdown(
+            """
+            <style>
+            /* Sidebar container layout using flexbox */
+            [data-testid="stSidebar"] > div:first-child {
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+    
+
+            /* Wrapper for navigation buttons */
+            .navigation-buttons {
+                flex-grow: 100; /* Occupy all available space to push the logout button down */
+            }
+    
+            /* Logout button pinned to the bottom */
+            .logout-button {
+                margin-top: 150%; /* Automatically pushes the button to the bottom */
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Navigation buttons
+        st.markdown('<div class="navigation-buttons">', unsafe_allow_html=True)
+        st.button("Calendar", on_click=navigate, args=("Calendar",))
+        st.button("Profile", on_click=navigate, args=("Profile",))
+        st.button("Contacts", on_click=navigate, args=("Contacts",))
+        st.button("Groups", on_click=navigate, args=("Groups",))
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Logout button pinned to the bottom
+        st.markdown('<div class="logout-button">', unsafe_allow_html=True)
+        if st.button("Logout", on_click=navigate, args=("Login",)):
+            st.write("You have logged out!")
+        st.markdown('</div>', unsafe_allow_html=True)
+
 
 # Pages
 if st.session_state["selected_page"] == "Calendar":
@@ -141,7 +209,9 @@ if st.session_state["selected_page"] == "Calendar":
         event_type = st.radio("Event Type", ["Recurring Event", "Single Event"])
     with col2:
         if event_type == "Recurring Event":
-            recurrence_days = st.multiselect("Select Recurrence Days", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
+            recurrence_days = st.multiselect("Select Recurrence Days",
+                                             ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+                                              "Sunday"])
         else:
             recurrence_days = []
 
@@ -175,7 +245,6 @@ if st.session_state["selected_page"] == "Calendar":
             # Save updated events and display success message
             save_data(EVENTS_FILE, {"events": st.session_state["all_events"]})
             st.success(f"Event(s) for {', '.join(selected_groups)} added successfully!")
-    
 
     st.subheader("Calendar")
     calendar(events=st.session_state["all_events"], options=calendar_options)
@@ -185,7 +254,8 @@ if st.session_state["selected_page"] == "Calendar":
         event_titles = [event["title"] for event in st.session_state["all_events"]]
         selected_event = st.selectbox("Select Event to Delete", event_titles)
         if st.button("Delete Event"):
-            st.session_state["all_events"] = [event for event in st.session_state["all_events"] if event["title"] != selected_event]
+            st.session_state["all_events"] = [event for event in st.session_state["all_events"] if
+                                              event["title"] != selected_event]
             save_data(EVENTS_FILE, {"events": st.session_state["all_events"]})
             st.success(f"Event '{selected_event}' deleted successfully!")
     else:
