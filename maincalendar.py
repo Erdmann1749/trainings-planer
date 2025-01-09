@@ -4,29 +4,23 @@ from datetime import datetime, timedelta, time
 from pathlib import Path
 from streamlit_calendar import calendar
 
-# Set page configuration for a wide layout
+# Set global layout to wide
 st.set_page_config(page_title="Tennis Scheduler", layout="wide")
 
 # Example data
 EXAMPLE_EVENTS = [
     {
-        "title": "🎾 Coaching Alice",
+        "title": "🎾 Coaching Felix Ott",
         "start": (datetime.now() + timedelta(days=1, hours=2)).isoformat(),
         "end": (datetime.now() + timedelta(days=1, hours=3)).isoformat(),
         "resourceId": "Court 1",
-        "backgroundColor": "#C1D6FF",
-        "textColor": "#000000",
     },
 ]
 
 EXAMPLE_CONTACTS = {
-    "Alice Smith": "alice@example.com",
-    "Bob Johnson": "bob@example.com",
-}
-
-EXAMPLE_GROUPS = {
-    "Male": ["Bob Johnson", "John Doe"],
-    "Female": ["Alice Smith", "Jane Doe"],
+    "students": {},
+    "trainers": {},
+    "groups": {}
 }
 
 EXAMPLE_PROFILE = {
@@ -54,18 +48,30 @@ def save_data(file_name, data):
 EVENTS_FILE = "plan.json"
 DATA_FILE = "data.json"
 all_events = load_data(EVENTS_FILE, {"events": EXAMPLE_EVENTS})["events"]
-data = load_data(DATA_FILE, {"contacts": EXAMPLE_CONTACTS, "groups": EXAMPLE_GROUPS})
-contacts = data.get("contacts", {})
-groups = data.get("groups", {})
+data = load_data(DATA_FILE, {"contacts": EXAMPLE_CONTACTS})
+contacts = data.get("contacts", EXAMPLE_CONTACTS)
 
+# Ensure keys exist
+if "students" not in contacts:
+    contacts["students"] = {}
+if "trainers" not in contacts:
+    contacts["trainers"] = {}
+if "groups" not in contacts:
+    contacts["groups"] = {}
+
+# Initialize session states
 if "all_events" not in st.session_state:
     st.session_state["all_events"] = all_events
 if "contacts" not in st.session_state:
     st.session_state["contacts"] = contacts
-if "groups" not in st.session_state:
-    st.session_state["groups"] = groups
 if "selected_page" not in st.session_state:
-    st.session_state["selected_page"] = "Calendar"
+    st.session_state["selected_page"] = "Trainingskalender"
+if "show_schueler_form" not in st.session_state:
+    st.session_state["show_schueler_form"] = False
+if "show_trainer_form" not in st.session_state:
+    st.session_state["show_trainer_form"] = False
+if "show_group_form" not in st.session_state:
+    st.session_state["show_group_form"] = False
 
 # Define courts as resources
 courts = [
@@ -80,167 +86,209 @@ calendar_options = {
     "headerToolbar": {
         "left": "prev,next today",
         "center": "title",
-        "right": "resourceTimelineDay,resourceTimelineWeek",
+        "right": "resourceTimeGridDay",
     },
-    "initialView": "resourceTimelineWeek",
+    "initialView": "resourceTimeGridDay",
     "height": "auto",
     "resources": courts,
-    "resourceAreaWidth": "150px",
-    "resourceLabelText": "Courts",
-    "views": {
-        "resourceTimelineDay": {
-            "type": "resourceTimeline",
-            "duration": {"days": 1},
-            "slotMinTime": "07:00:00",
-            "slotMaxTime": "24:00:00",
-        },
-        "resourceTimelineWeek": {
-            "type": "resourceTimeline",
-            "duration": {"days": 7},
-            "slotMinTime": "07:00:00",
-            "slotMaxTime": "24:00:00",
-        },
-    },
+    "resourceAreaWidth": "200px",
+    "resourceLabelText": "Plätze",
+    "slotMinTime": "07:00:00",
+    "slotMaxTime": "24:00:00",
 }
 
-# Navigation
-def navigate(page):
-    st.session_state["selected_page"] = page
+# Add custom CSS for column borders
+def add_column_borders():
+    st.markdown(
+        """
+        <style>
+        .column {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 5px;
+            background-color: #f9f9f9;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-st.sidebar.title("Navigation")
-st.sidebar.button("Calendar", on_click=navigate, args=("Calendar",))
-st.sidebar.button("Profile", on_click=navigate, args=("Profile",))
-st.sidebar.button("Contacts", on_click=navigate, args=("Contacts",))
-st.sidebar.button("Groups", on_click=navigate, args=("Groups",))
+# Sidebar Navigation
+if st.sidebar.button("Trainingskalender"):
+    st.session_state["selected_page"] = "Trainingskalender"
+if st.sidebar.button("Mein Profil"):
+    st.session_state["selected_page"] = "Mein Profil"
+if st.sidebar.button("Kontakte"):
+    st.session_state["selected_page"] = "Kontakte"
 
 # Pages
-if st.session_state["selected_page"] == "Calendar":
-    st.title("🎾 Training Scheduler")
+if st.session_state["selected_page"] == "Trainingskalender":
+    st.title("Trainingskalender")
 
-    st.subheader("Create a New Event")
-    coach = st.selectbox("Coach", ["Felix Ott", "Pino Ott", "Ronny Kemmerich"])
+    # Create three columns for information above the calendar
+    col1, col2, col3 = st.columns(3)
 
-    st.write("### Select Groups")
-    col1, col2 = st.columns(2)
+    # Column 1: Trainer Selection
     with col1:
-        st.write("**Male**")
-        male_groups = {g: st.checkbox(g) for g in groups.get("Male", [])}
+        st.subheader("Neues Training erstellen")
+        coach = st.selectbox("Trainer", ["Felix Ott", "Pino Ott", "Ronny Kemmerich"])
+
+    # Column 2: Court and Group Selection
     with col2:
-        st.write("**Female**")
-        female_groups = {g: st.checkbox(g) for g in groups.get("Female", [])}
+        st.subheader("Platz und Gruppe auswählen")
+        selected_court = st.selectbox("Platz auswählen", [court["title"] for court in courts])
+        group = st.selectbox("Gruppe auswählen", ["Keine Gruppe"] + list(st.session_state["contacts"]["groups"].keys()))
 
-    selected_groups = [group for group, selected in {**male_groups, **female_groups}.items() if selected]
+    # Column 3: Date and Time Selection
+    with col3:
+        st.subheader("Datum und Zeit")
+        event_start_date = st.date_input("Startdatum")
+        event_start_time = st.time_input("Startzeit", time(8, 0))
+        event_end_time = st.time_input("Endzeit", time(10, 0))
 
-    event_start_date = st.date_input("Start Date")
-    event_start_time = st.time_input("Start Time", time(8, 0))
-    event_end_time = st.time_input("End Time", time(10, 0))
+    # Button to add a new event
+    if st.button("Training hinzufügen"):
+        start = datetime.combine(event_start_date, event_start_time).isoformat()
+        end = datetime.combine(event_start_date, event_end_time).isoformat()
 
-    # Event Type Selection on the Same Line
-    col1, col2 = st.columns([1, 2])  # Adjust column width if needed
-    with col1:
-        event_type = st.radio("Event Type", ["Recurring Event", "Single Event"])
-    with col2:
-        if event_type == "Recurring Event":
-            recurrence_days = st.multiselect("Select Recurrence Days", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
-        else:
-            recurrence_days = []
+        new_event = {
+            "title": f"Training mit Trainer {coach}" + (f" ({group})" if group != "Keine Gruppe" else ""),
+            "start": start,
+            "end": end,
+            "resourceId": selected_court,
+        }
+        st.session_state["all_events"].append(new_event)
+        save_data(EVENTS_FILE, {"events": st.session_state["all_events"]})
+        st.success(f"Training mit Trainer {coach} erfolgreich hinzugefügt!")
 
-    if st.button("Add Event"):
-        # Validation to ensure at least one group is selected
-        if not selected_groups:
-            st.error("You must select at least one group before creating an event.")
-        else:
-            # Proceed to create the event if a group is selected
-            start = datetime.combine(event_start_date, event_start_time).isoformat()
-            end = datetime.combine(event_start_date, event_end_time).isoformat()
-            for group in selected_groups:
-                if event_type == "Single Event":
-                    new_event = {
-                        "title": group,  # Only show the group or person's name
-                        "start": start,
-                        "end": end,
-                        "resourceId": "Court 1",
-                    }
-                    st.session_state["all_events"].append(new_event)
-                else:
-                    for _ in recurrence_days:  # Recurrence days are selected but not part of the title
-                        new_event = {
-                            "title": group,  # Only show the group or person's name
-                            "start": start,
-                            "end": end,
-                            "resourceId": "Court 1",
-                        }
-                        st.session_state["all_events"].append(new_event)
+    # Calendar Section
+    st.subheader("Trainingsansicht")
+    try:
+        calendar(events=st.session_state["all_events"], options=calendar_options)
+    except Exception as e:
+        st.error(f"Fehler beim Laden des Kalenders: {e}")
 
-            # Save updated events and display success message
-            save_data(EVENTS_FILE, {"events": st.session_state["all_events"]})
-            st.success(f"Event(s) for {', '.join(selected_groups)} added successfully!")
-    
-
-    st.subheader("Calendar")
-    calendar(events=st.session_state["all_events"], options=calendar_options)
-
-    st.subheader("Delete Event")
+    # Training Deletion Section
+    st.subheader("Training löschen")
     if st.session_state["all_events"]:
         event_titles = [event["title"] for event in st.session_state["all_events"]]
-        selected_event = st.selectbox("Select Event to Delete", event_titles)
-        if st.button("Delete Event"):
-            st.session_state["all_events"] = [event for event in st.session_state["all_events"] if event["title"] != selected_event]
+        selected_event = st.selectbox("Training auswählen", event_titles)
+        if st.button("Training löschen"):
+            st.session_state["all_events"] = [
+                event for event in st.session_state["all_events"] if event["title"] != selected_event
+            ]
             save_data(EVENTS_FILE, {"events": st.session_state["all_events"]})
-            st.success(f"Event '{selected_event}' deleted successfully!")
+            st.success(f"Training '{selected_event}' erfolgreich gelöscht!")
     else:
-        st.info("No events available to delete.")
+        st.info("Keine Trainings verfügbar.")
 
-elif st.session_state["selected_page"] == "Profile":
-    st.title("👤 Profile Page")
+elif st.session_state["selected_page"] == "Mein Profil":
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            max-width: 600px;
+            margin: auto;
+            padding-top: 2rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.title("Mein Profil")
+
+    # Display profile information
+    st.markdown("### Profilinformationen")
     st.write(f"**Name:** {EXAMPLE_PROFILE['Name']}")
-    st.write(f"**Email:** {EXAMPLE_PROFILE['Email']}")
-    st.write(f"**Phone:** {EXAMPLE_PROFILE['Phone']}")
-    st.write(f"**Address:** {EXAMPLE_PROFILE['Address']}")
+    st.write(f"**E-Mail:** {EXAMPLE_PROFILE['Email']}")
+    st.write(f"**Telefon:** {EXAMPLE_PROFILE['Phone']}")
+    st.write(f"**Adresse:** {EXAMPLE_PROFILE['Address']}")
 
-elif st.session_state["selected_page"] == "Contacts":
-    st.title("📇 Contacts Page")
-    st.write("### Add a New Contact")
-    new_name = st.text_input("Name")
-    new_email = st.text_input("Email")
-    if st.button("Add Contact"):
-        if new_name and new_email:
-            st.session_state["contacts"][new_name] = new_email
-            save_data(DATA_FILE, {"contacts": st.session_state["contacts"], "groups": st.session_state["groups"]})
-            st.success(f"Contact {new_name} added successfully!")
-        else:
-            st.error("Please provide both name and email.")
+elif st.session_state["selected_page"] == "Kontakte":
+    st.title("Kontakte")
+    add_column_borders()
 
-    st.write("### Delete a Contact")
-    if st.session_state["contacts"]:
-        contact_to_delete = st.selectbox("Select a Contact", list(st.session_state["contacts"].keys()))
-        if st.button("Delete Contact"):
-            del st.session_state["contacts"][contact_to_delete]
-            save_data(DATA_FILE, {"contacts": st.session_state["contacts"], "groups": st.session_state["groups"]})
-            st.success(f"Contact {contact_to_delete} deleted successfully!")
-    else:
-        st.info("No contacts available.")
+    col1, col2, col3 = st.columns(3)
 
-elif st.session_state["selected_page"] == "Groups":
-    st.title("👥 Groups Page")
-    st.write("### Add a New Group")
-    new_group_name = st.text_input("Group Name")
-    new_group_gender = st.radio("Gender", ["Male", "Female"])
-    if st.button("Add Group"):
-        if new_group_name:
-            st.session_state["groups"].setdefault(new_group_gender, []).append(new_group_name)
-            save_data(DATA_FILE, {"contacts": st.session_state["contacts"], "groups": st.session_state["groups"]})
-            st.success(f"Group {new_group_name} added to {new_group_gender} groups successfully!")
-        else:
-            st.error("Please provide a group name.")
+    # Schüler/in Column
+    with col1:
+        st.markdown('<div class="column"><h4>Schüler/in</h4>', unsafe_allow_html=True)
+        if st.button("➕ Schüler/in", key="add_schueler"):
+            st.session_state["show_schueler_form"] = not st.session_state["show_schueler_form"]
+        
+        if st.session_state["show_schueler_form"]:
+            with st.form("add_schueler_form", clear_on_submit=True):
+                name = st.text_input("Full Name", key="schueler_name")
+                email = st.text_input("Email", key="schueler_email")
+                gender = st.selectbox("Geschlecht", ["m", "w", "d"], key="schueler_gender")
+                submitted = st.form_submit_button("Add Schüler/in")
+                if submitted:
+                    st.session_state["contacts"]["students"][name] = {"email": email, "gender": gender}
+                    st.session_state["show_schueler_form"] = False
+                    save_data(DATA_FILE, {"contacts": st.session_state["contacts"]})
+        
+        # Display students
+        for student, details in list(st.session_state["contacts"]["students"].items()):
+            col_student, col_delete = st.columns([4, 1])
+            with col_student:
+                st.write(f"{student} ({details['email']}, {details['gender']})")
+            with col_delete:
+                if st.button("❌", key=f"delete_student_{student}"):
+                    del st.session_state["contacts"]["students"][student]
+                    save_data(DATA_FILE, {"contacts": st.session_state["contacts"]})
 
-    st.write("### Delete a Group")
-    gender = st.radio("Select Gender", ["Male", "Female"], key="delete_group_gender")
-    if st.session_state["groups"].get(gender):
-        group_to_delete = st.selectbox("Select a Group", st.session_state["groups"][gender], key="delete_group")
-        if st.button("Delete Group"):
-            st.session_state["groups"][gender].remove(group_to_delete)
-            save_data(DATA_FILE, {"contacts": st.session_state["contacts"], "groups": st.session_state["groups"]})
-            st.success(f"Group {group_to_delete} deleted successfully!")
-    else:
-        st.info(f"No {gender} groups available.")
+    # Trainer Column
+    with col2:
+        st.markdown('<div class="column"><h4>Trainer</h4>', unsafe_allow_html=True)
+        if st.button("➕ Trainer", key="add_trainer"):
+            st.session_state["show_trainer_form"] = not st.session_state["show_trainer_form"]
+
+        if st.session_state["show_trainer_form"]:
+            with st.form("add_trainer_form", clear_on_submit=True):
+                name = st.text_input("Full Name", key="trainer_name")
+                email = st.text_input("Email", key="trainer_email")
+                gender = st.selectbox("Geschlecht", ["m", "w", "d"], key="trainer_gender")
+                submitted = st.form_submit_button("Add Trainer")
+                if submitted:
+                    st.session_state["contacts"]["trainers"][name] = {"email": email, "gender": gender}
+                    st.session_state["show_trainer_form"] = False
+                    save_data(DATA_FILE, {"contacts": st.session_state["contacts"]})
+
+        # Display trainers
+        for trainer, details in list(st.session_state["contacts"]["trainers"].items()):
+            col_trainer, col_delete = st.columns([4, 1])
+            with col_trainer:
+                st.write(f"{trainer} ({details['email']}, {details['gender']})")
+            with col_delete:
+                if st.button("❌", key=f"delete_trainer_{trainer}"):
+                    del st.session_state["contacts"]["trainers"][trainer]
+                    save_data(DATA_FILE, {"contacts": st.session_state["contacts"]})                
+
+    # Gruppen Column
+    with col3:
+        st.markdown('<div class="column"><h4>Gruppen</h4>', unsafe_allow_html=True)
+        if st.button("➕ Gruppen", key="add_group"):
+            st.session_state["show_group_form"] = not st.session_state["show_group_form"]
+
+        if st.session_state["show_group_form"]:
+            with st.form("add_group_form", clear_on_submit=True):
+                group_name = st.text_input("Group Name", key="group_name")
+                group_students = st.multiselect(
+                    "Add Students to Group",
+                    options=list(st.session_state["contacts"]["students"].keys()),
+                    key="group_students",
+                )
+                submitted = st.form_submit_button("Add Group")
+                if submitted:
+                    st.session_state["contacts"]["groups"][group_name] = group_students
+                    st.session_state["show_group_form"] = False
+                    save_data(DATA_FILE, {"contacts": st.session_state["contacts"]})
+                    st.success(f"Group '{group_name}' successfully created!")
+
+        # Display groups
+        for group, members in list(st.session_state["contacts"]["groups"].items()):
+            st.write(f"**{group}:** {', '.join(members)}")
+            if st.button(f"❌ Delete {group}", key=f"delete_group_{group}"):
+                del st.session_state["contacts"]["groups"][group]
+                save_data(DATA_FILE, {"contacts": st.session_state["contacts"]})
