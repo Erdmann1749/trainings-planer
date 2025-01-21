@@ -40,17 +40,46 @@ def load_data(file_name, default_data):
         data = default_data
     return data
 
+
 def save_data(file_name, data):
     with open(file_name, "w") as f:
         json.dump(data, f)
 
+
+def sign_in(user_name, password):
+    # Create a placeholder
+    message_placeholder = st.empty()
+    user_data = load_data(USER_DATA_FILE, {})
+    if user_name in user_data and user_data[user_name] == password:
+        st.session_state["selected_page"] = "Trainingskalender"
+        message_placeholder.success("Sign-in successful!")
+    elif user_name not in user_data:
+        message_placeholder.warning("Username not recognized.")
+    else:
+        message_placeholder.error("Incorrect password.")
+
+USER_DATA_FILE = Path("user_data.json")
+user_data = load_data(USER_DATA_FILE, {})
+if "selected_page" not in st.session_state:
+    st.session_state["selected_page"] = "Login"
+
+if st.session_state["selected_page"] == "Login":
+    # login page if not logged in
+    user_name = st.text_input("User Name", key="user_name")
+    password = st.text_input("Password", type="password")
+    sign_in_button = st.button("Sign In")
+    if sign_in_button:
+        sign_in(user_name, password)
+
 # Initialize data files
 EVENTS_FILE = "plan.json"
 DATA_FILE = "data.json"
+
 all_events = load_data(EVENTS_FILE, {"events": EXAMPLE_EVENTS})["events"]
 data = load_data(DATA_FILE, {"contacts": EXAMPLE_CONTACTS})
 contacts = data.get("contacts", EXAMPLE_CONTACTS)
 
+# Ensure keys exist
 # Ensure keys exist
 if "students" not in contacts:
     contacts["students"] = {}
@@ -75,8 +104,8 @@ if "show_group_form" not in st.session_state:
 
 # Define courts as resources
 courts = [
-    {"id": f"Court {i}", "title": f"Court {i}"} for i in range(1, 7)
-] + [{"id": f"Court {i}", "title": f"Court {i} (Indoor)"} for i in range(7, 9)]
+             {"id": f"Court {i}", "title": f"Court {i}"} for i in range(1, 7)
+         ] + [{"id": f"Court {i}", "title": f"Court {i} (Indoor)"} for i in range(7, 9)]
 
 # Updated calendar options with day and week views available in the toolbar
 calendar_options = {
@@ -98,8 +127,6 @@ calendar_options = {
     "scrollTime": "08:00:00",  # Start the scroll at 8 AM
 }
 
-
-# Add custom CSS for column borders
 def add_column_borders():
     st.markdown(
         """
@@ -116,13 +143,55 @@ def add_column_borders():
         unsafe_allow_html=True,
     )
 
-# Sidebar Navigation
-if st.sidebar.button("Trainingskalender"):
-    st.session_state["selected_page"] = "Trainingskalender"
-if st.sidebar.button("Mein Profil"):
-    st.session_state["selected_page"] = "Mein Profil"
-if st.sidebar.button("Kontakte"):
-    st.session_state["selected_page"] = "Kontakte"
+
+# Navigation
+def navigate(page):
+    st.session_state["selected_page"] = page
+
+if st.session_state["selected_page"] != "Login":
+    st.sidebar.title("Navigation")
+
+    # Group for the main navigation buttons
+    with st.sidebar:
+        # Inject custom CSS for flexbox layout
+        st.markdown(
+            """
+            <style>
+            /* Sidebar container layout using flexbox */
+            [data-testid="stSidebar"] > div:first-child {
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+    
+
+            /* Wrapper for navigation buttons */
+            .navigation-buttons {
+                flex-grow: 100; /* Occupy all available space to push the logout button down */
+            }
+    
+            /* Logout button pinned to the bottom */
+            .logout-button {
+                margin-top: 150%; /* Automatically pushes the button to the bottom */
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Navigation buttons
+        st.markdown('<div class="navigation-buttons">', unsafe_allow_html=True)
+        st.button("Trainingskalender", on_click=navigate, args=("Trainingskalender",))
+        st.button("Mein Profil", on_click=navigate, args=("Mein Profil",))
+        st.button("Kontakte", on_click=navigate, args=("Kontakte",))
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Logout button pinned to the bottom
+        st.markdown('<div class="logout-button">', unsafe_allow_html=True)
+        if st.button("Logout", on_click=navigate, args=("Login",)):
+            st.write("You have logged out!")
+        st.markdown('</div>', unsafe_allow_html=True)
+
 
 # Pages
 if st.session_state["selected_page"] == "Trainingskalender":
@@ -205,7 +274,7 @@ elif st.session_state["selected_page"] == "Kontakte":
         st.markdown('<div class="column"><h4>Schüler/in</h4>', unsafe_allow_html=True)
         if st.button("➕ Schüler/in", key="add_schueler"):
             st.session_state["show_schueler_form"] = not st.session_state["show_schueler_form"]
-        
+
         if st.session_state["show_schueler_form"]:
             with st.form("add_schueler_form", clear_on_submit=True):
                 name = st.text_input("Full Name", key="schueler_name")
@@ -216,7 +285,7 @@ elif st.session_state["selected_page"] == "Kontakte":
                     st.session_state["contacts"]["students"][name] = {"email": email, "gender": gender}
                     st.session_state["show_schueler_form"] = False
                     save_data(DATA_FILE, {"contacts": st.session_state["contacts"]})
-        
+
         # Display students
         for student, details in list(st.session_state["contacts"]["students"].items()):
             col_student, col_delete = st.columns([4, 1])
@@ -252,12 +321,12 @@ elif st.session_state["selected_page"] == "Kontakte":
             with col_delete:
                 if st.button("❌", key=f"delete_trainer_{trainer}"):
                     del st.session_state["contacts"]["trainers"][trainer]
-                    save_data(DATA_FILE, {"contacts": st.session_state["contacts"]})                
+                    save_data(DATA_FILE, {"contacts": st.session_state["contacts"]})
 
     # Gruppen Column (All actions in column 3)
     with col3:
         st.markdown('<div class="column"><h4>Gruppen</h4>', unsafe_allow_html=True)
-        
+
         # Add Group Button and Form
         if st.button("➕ Gruppen", key="add_group"):
             st.session_state["show_group_form"] = not st.session_state["show_group_form"]
