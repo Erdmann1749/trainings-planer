@@ -1,1 +1,1 @@
-{"contacts": {"Lisa Buchheim": "lisabuchheim@me.com", "students": {}, "trainers": {}, "groups": {}}}
+{"contacts": {"Lisa Buchheim": "lisabuchheim@me.com", "students": {"Simon": {"email": "", "gender": "m"}}, "trainers": {"Felix": {"email": "", "gender": "m"}}, "groups": {"u14 m\u00e4dchen": ["Simon"]}}}
