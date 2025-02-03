@@ -1,2 +1,3 @@
 plan.json
 data.json
+*.sqlite3

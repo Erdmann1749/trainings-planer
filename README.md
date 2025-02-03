@@ -1,42 +1,56 @@
-# trainings-planer
+# Django Trainingsplaner
 
-## Set up
+## 🚀 Projekt-Setup & Lokale Entwicklung
 
-Create virtual env.
-
-On macOS/Linux:
+### Repository klonen & in das Projektverzeichnis wechseln
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+git checkout django-initial-push
 ```
 
-On Windows:
+### Virtuelle Umgebung erstellen und aktivieren
 ```bash
 python -m venv venv
-venv\Scripts\activate
+source venv/bin/activate  # Mac/Linux
+venv\Scripts\activate  # Windows
 ```
 
-All required packages for this project are listed in the requirements.txt file.
+### Abhängigkeiten installieren
 ```bash
 pip install -r requirements.txt
 ```
 
-## run
+### Datenbank vorbereiten
 ```bash
-streamlit run planer.py
-```
-Stop with Ctrl+C in terminal.
-
-## updating dependencies:
-```bash
-pip install new-package
-pip freeze > requirements.txt
+python manage.py migrate
+python manage.py createsuperuser  # Optional für Admin-Zugang
 ```
 
-## end
-Deactivate the environment:
+### Server starten
 ```bash
-deactivate
+python manage.py runserver
+```
+Die App läuft jetzt unter **http://127.0.0.1:8000/** 🚀
+
+## 📁 Wichtige Ordner & Dateien
+```bash
+.
+├── config/         # Django-Projektkonfiguration
+├── training/       # Haupt-App mit Views, Models, Templates
+├── templates/      # HTML-Templates
+├── static/         # Statische Dateien (CSS, JS, Bilder)
+├── manage.py       # Django-CLI-Tool
+├── requirements.txt # Paketabhängigkeiten
+└── README.md       # Diese Datei
 ```
 
+## 🛠 Nützliche Befehle
+### Django Shell starten
+```bash
+python manage.py shell
+```
+
+### Django Admin-Panel aufrufen
+```bash
+http://127.0.0.1:8000/admin/
+```
 
