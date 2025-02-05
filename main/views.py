@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 
 def custom_login(request):
@@ -14,6 +14,11 @@ def custom_login(request):
         else:
             messages.error(request, "Ungültige Anmeldeinformationen")
     return render(request, "main/login.html")
+
+def custom_logout(request):
+    logout(request)
+    return redirect("login")
+
 
 def addcontacts(request):
     return render(request, "main/addcontacts.html")

@@ -7,4 +7,5 @@ urlpatterns  = [
     path("create-group/", views.creategroup, name="creategroup"),
     path("group-details/", views.groupdetailspage, name="groupdetailspage"),
     path("calendar/", views.calendarview, name="calendarview"),
+    path("logout/", views.custom_logout, name="logout"),
 ]
